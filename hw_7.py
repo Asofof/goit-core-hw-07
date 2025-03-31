@@ -25,10 +25,8 @@ class Phone(Field):
 class Birthday(Field):
     def __init__(self, value):
         try:
-            date_obj = datetime.strptime(value, "%d.%m.%Y").date()
-            if date_obj > datetime.today().date():
-                raise ValueError("Birthday cannot be in the future.")
-            self.value = date_obj
+            datetime.strptime(value, "%d.%m.%Y")  # Перевірка формату
+            self.value = value  # Зберігаємо як рядок
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY.")
 
@@ -85,9 +83,12 @@ class AddressBook(UserDict):
         upcoming_birthdays = []
         for record in self.data.values():
             if record.birthday:
-                birthday_this_year = record.birthday.value.replace(year=today.year)
+                birthday_date = datetime.strptime(record.birthday.value, "%d.%m.%Y").date()
+                birthday_this_year = birthday_date.replace(year=today.year)
+
                 if birthday_this_year < today:
                     birthday_this_year = birthday_this_year.replace(year=today.year + 1)
+
                 days_until_birthday = (birthday_this_year - today).days
                 if 0 <= days_until_birthday <= 7:
                     greeting_date = birthday_this_year
@@ -110,7 +111,9 @@ def input_error(func):
         except ValueError as e:
             return str(e)
         except IndexError:
-            return "Enter the argument for the command." 
+            return "Enter the argument for the command."
+        except TypeError: # тепер помилку TypeError перехоплює
+            return "Invalid input. Please check your data and try again." 
     return inner
 
 def parse_input(user_input):
@@ -119,11 +122,7 @@ def parse_input(user_input):
 
 @input_error 
 def add_contact(args, book: AddressBook):
-    if not args:
-        return "Enter a name for the contact."
-    
-    name = args[0]
-    phone = args[1] if len(args) > 1 else None  # Перевіряємо, чи є телефон
+    name, phone = args[0], args[1] if len(args) > 1 else None  # Перевіряємо, чи є телефон
     
     record = book.find(name)
     message = "Contact updated."
@@ -139,43 +138,39 @@ def add_contact(args, book: AddressBook):
     return message
 
 @input_error 
-def change_contact(args, address_book):
-    if len(args) < 3:
-        return "Enter a name, old phone, and new phone."
+def change_contact(args, book: AddressBook):
     name, old_phone, new_phone = args
-    record = address_book.find(name)
+    record = book.find(name)
     if record:
         record.edit_phone(old_phone, new_phone)
         return f"Phone updated for contact {name}."
     return "This contact does not exist." 
 
 @input_error
-def show_phone(args, address_book):
+def show_phone(args, book: AddressBook):
     if not args:
         return "Enter a contact name."
     name = args[0]
-    record = address_book.find(name)
+    record = book.find(name)
     if record:
         return f"Phones for {name}: {', '.join(p.value for p in record.phones)}"
     return "This contact does not exist."
 
 @input_error
-def delete_contact(args, address_book):
+def delete_contact(args, book: AddressBook):
     if not args:
         return "Enter a contact name to delete."
     name = args[0]
-    address_book.delete(name)
+    book.delete(name)
     return f"Contact {name} deleted."
 
-def show_all(address_book):
-    if not address_book.data:
+def show_all(book: AddressBook):
+    if not book.data:
         return "No contacts saved."
-    return str(address_book)
+    return str(book)
 
 @input_error
-def add_birthday(args, book):
-    if len(args) < 2:
-        return "Enter a name and a birthday (DD.MM.YYYY)."
+def add_birthday(args, book: AddressBook):
     name, birthday = args
     record = book.find(name)
     if record:
@@ -184,7 +179,7 @@ def add_birthday(args, book):
     return "This contact does not exist."
 
 @input_error
-def show_birthday(args, book):
+def show_birthday(args, book: AddressBook):
     name = args[0]
     record = book.find(name)
     if record and record.birthday:
@@ -192,17 +187,16 @@ def show_birthday(args, book):
     return "No birthday found for this contact."
 
 @input_error
-def birthdays(args, book):
+def birthdays(args, book: AddressBook):
     upcoming = book.get_upcoming_birthdays()
     if not upcoming:
         return "No upcoming birthdays."
     return "\n".join([f"{entry['name']}: {entry['birthday']}" for entry in upcoming])
 
 def main():
-    address_book = AddressBook()
+    book = AddressBook()
     print("Welcome to the assistant bot!")
-    
-    # добавила словарь commands
+
     commands = {
         "add": add_contact,
         "change": change_contact,
@@ -212,23 +206,22 @@ def main():
         "add-birthday": add_birthday,
         "birthdays": birthdays,
     }
-   
+
     while True:
         user_input = input("Enter a command: ").strip()
         if not user_input:
             print("Please enter a valid command.")
             continue
 
-        command, *args = parse_input(user_input)
-
+        command, args = parse_input(user_input)
+        
         if command in ["close", "exit"]:
             print("Good bye!")
             break
         elif command == "hello":
             print("How can I help you?")
-        # проверяем есть ли команда в словаре   
         elif command in commands:
-            print(commands[command](args, address_book))
+            print(commands[command](args, book))
         else:
             print("Unknown command.")
 
