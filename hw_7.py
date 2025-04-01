@@ -164,7 +164,7 @@ def delete_contact(args, book: AddressBook):
     book.delete(name)
     return f"Contact {name} deleted."
 
-def show_all(book: AddressBook):
+def show_all(args, book: AddressBook):
     if not book.data:
         return "No contacts saved."
     return str(book)
@@ -202,7 +202,7 @@ def main():
         "change": change_contact,
         "phone": show_phone,
         "all": show_all,
-        "birthday": show_birthday,
+        "show-birthday": show_birthday,
         "add-birthday": add_birthday,
         "birthdays": birthdays,
     }
