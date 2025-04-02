@@ -36,7 +36,10 @@ class Record:
         self.phones = []
         self.birthday = None
         
-    def add_phone(self, phone): 
+    def add_phone(self, phone):
+        # Проверка на дублирование номера
+        if any(p.value == phone for p in self.phones):
+            raise ValueError(f"Phone number {phone} is already added.")
         self.phones.append(Phone(phone))
 
     def remove_phone(self, phone): 
@@ -58,13 +61,18 @@ class Record:
     def add_birthday(self, birthday):
         if self.birthday:
             raise ValueError("Birthday is already set.")
-        self.birthday = Birthday(birthday)
+        # Преобразуем строку в дату внутри метода
+        try:
+            datetime.strptime(birthday, "%d.%m.%Y")
+            self.birthday = Birthday(birthday)
+        except ValueError:
+            raise ValueError("Invalid date format. Use DD.MM.YYYY.")
 
     def __str__(self):
         phones = "; ".join(p.value for p in self.phones)
-        birthday_str = f", Birthday: {self.birthday.value.strftime('%d.%m.%Y')}" if self.birthday else ""
+        birthday_str = f", Birthday: {self.birthday.value}" if self.birthday else ""
         return f"Contact name: {self.name.value}, phones: {phones}{birthday_str}"
-
+     
 class AddressBook(UserDict):
     def add_record(self, record):
         self.data[record.name.value] = record
@@ -77,12 +85,13 @@ class AddressBook(UserDict):
             del self.data[name]
         else:
             raise KeyError(f"No contact named {name}")
-        
+
     def get_upcoming_birthdays(self):
         today = datetime.today().date()
         upcoming_birthdays = []
         for record in self.data.values():
             if record.birthday:
+                # Преобразуем строку в дату внутри метода
                 birthday_date = datetime.strptime(record.birthday.value, "%d.%m.%Y").date()
                 birthday_this_year = birthday_date.replace(year=today.year)
 
@@ -157,6 +166,19 @@ def show_phone(args, book: AddressBook):
     return "This contact does not exist."
 
 @input_error
+def remove_phone(args, book: AddressBook): 
+    name, phone = args[0], args[1]
+    record = book.find(name)
+
+    if record:
+        try:
+            record.remove_phone(phone)
+            return f"Phone {phone} removed from contact {name}."
+        except ValueError as e:
+            return str(e)
+    return "This contact does not exist."
+
+@input_error
 def delete_contact(args, book: AddressBook):
     if not args:
         return "Enter a contact name to delete."
@@ -183,7 +205,12 @@ def show_birthday(args, book: AddressBook):
     name = args[0]
     record = book.find(name)
     if record and record.birthday:
-        return f"Birthday of {name}: {record.birthday.value.strftime('%d.%m.%Y')}"
+        try:
+            # Преобразуем строку в дату перед использованием strftime
+            birthday_date = datetime.strptime(record.birthday.value, "%d.%m.%Y")
+            return f"Birthday of {name}: {birthday_date.strftime('%d.%m.%Y')}"
+        except ValueError:
+            return "Invalid date format. Use DD.MM.YYYY."
     return "No birthday found for this contact."
 
 @input_error
@@ -201,6 +228,8 @@ def main():
         "add": add_contact,
         "change": change_contact,
         "phone": show_phone,
+        "remove": remove_phone,
+        "delete": delete_contact,
         "all": show_all,
         "show-birthday": show_birthday,
         "add-birthday": add_birthday,
